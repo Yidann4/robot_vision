@@ -59,7 +59,7 @@ import struct
 DEBUG = 1
 
 HSV_RANGES = {
-    'yellow': (8, 179, 0, 70, 0, 255),
+    'yellow': (8, 70, 0, 255, 0, 255),
     'blue': (87, 179, 0, 255, 0, 255),
 }
 
@@ -73,6 +73,8 @@ class LineFilterNode(Node):
     def __init__(self):
         super().__init__('line_filter_node')
         self.get_logger().info('Line filter node starting...')
+        self.chunk_size_x_m = 0.10
+        self.chunk_size_y_m = 0.10
 
         # Subscribe to the full projected point cloud
         self.sub = self.create_subscription(
@@ -190,6 +192,18 @@ class LineFilterNode(Node):
             self.get_logger().debug(f'Publishing {total_kept} {colour_name} line points')
 
         filtered_xyz = xyz[keep]                                    # shape (M, 3) float32
+        filtered_rgb = rgb_packed[keep]
+
+        filtered_xyz, filtered_rgb = self._chunk_points_xy_mean(filtered_xyz, filtered_rgb)
+        total_out = int(filtered_xyz.shape[0])
+        if total_out == 0:
+            return
+
+        if DEBUG:
+            self.get_logger().debug(
+                f'Chunked {colour_name}: {total_kept} raw points -> {total_out} mean points '
+                f'using {self.chunk_size_x_m:.3f}x{self.chunk_size_y_m:.3f} m cells'
+            )
 
         # Create a structured numpy array that perfectly matches the cloud layout.
         # This completely avoids Python loop overhead and NaN casting errors.
@@ -200,11 +214,11 @@ class LineFilterNode(Node):
             ('rgb', np.uint32)  # Keep it as uint32 here matching the raw byte layout
         ])
 
-        filtered_struct = np.zeros(total_kept, dtype=cloud_dtype)
+        filtered_struct = np.zeros(total_out, dtype=cloud_dtype)
         filtered_struct['x'] = filtered_xyz[:, 0]
         filtered_struct['y'] = filtered_xyz[:, 1]
         filtered_struct['z'] = filtered_xyz[:, 2]
-        filtered_struct['rgb'] = rgb_packed[keep]  # Use the original packed uint32 array directly
+        filtered_struct['rgb'] = filtered_rgb
 
         # Use the same fields definition as the input cloud
         out_msg = point_cloud2.create_cloud(
@@ -214,6 +228,42 @@ class LineFilterNode(Node):
         )
 
         publisher.publish(out_msg)
+
+    def _chunk_points_xy_mean(self, xyz: np.ndarray, rgb_packed: np.ndarray):
+        """
+        Aggregate points into XY grid cells and return one mean point per cell.
+        Cell size is configurable via self.chunk_size_x_m and self.chunk_size_y_m.
+        """
+        if xyz.shape[0] == 0:
+            return xyz, rgb_packed
+
+        if self.chunk_size_x_m <= 0.0 or self.chunk_size_y_m <= 0.0:
+            return xyz, rgb_packed
+
+        bin_x = np.floor(xyz[:, 0] / self.chunk_size_x_m).astype(np.int64)
+        bin_y = np.floor(xyz[:, 1] / self.chunk_size_y_m).astype(np.int64)
+        bin_ids = np.stack([bin_x, bin_y], axis=1)
+
+        _, inverse = np.unique(bin_ids, axis=0, return_inverse=True)
+        n_bins = int(np.max(inverse)) + 1
+
+        counts = np.bincount(inverse, minlength=n_bins).astype(np.float32)
+
+        sum_x = np.bincount(inverse, weights=xyz[:, 0], minlength=n_bins)
+        sum_y = np.bincount(inverse, weights=xyz[:, 1], minlength=n_bins)
+        sum_z = np.bincount(inverse, weights=xyz[:, 2], minlength=n_bins)
+        mean_xyz = np.stack([sum_x / counts, sum_y / counts, sum_z / counts], axis=1).astype(np.float32)
+
+        r = ((rgb_packed >> 16) & 0xFF).astype(np.float32)
+        g = ((rgb_packed >> 8) & 0xFF).astype(np.float32)
+        b = (rgb_packed & 0xFF).astype(np.float32)
+
+        mean_r = np.clip(np.rint(np.bincount(inverse, weights=r, minlength=n_bins) / counts), 0, 255).astype(np.uint32)
+        mean_g = np.clip(np.rint(np.bincount(inverse, weights=g, minlength=n_bins) / counts), 0, 255).astype(np.uint32)
+        mean_b = np.clip(np.rint(np.bincount(inverse, weights=b, minlength=n_bins) / counts), 0, 255).astype(np.uint32)
+        mean_rgb = ((mean_r << 16) | (mean_g << 8) | mean_b).astype(np.uint32)
+
+        return mean_xyz, mean_rgb
 
     @staticmethod
     def _rgb_to_hsv_numpy(r: np.ndarray, g: np.ndarray, b: np.ndarray) -> np.ndarray:

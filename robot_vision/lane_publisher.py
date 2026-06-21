@@ -2,39 +2,42 @@ import rclpy
 import math
 
 from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
 
+CONFIG_POSITIVE_Y_BIAS_M_PER_M = 0.3 # left bias
+CONFIG_POSITIVE_X_BIAS_M_PER_M = 0.1 # forward bias
+
 class LanePathPublisher(Node):
-    def __init__(self):
-        super().__init__('lane_path_publisher')
-        self.blue_points = []
-        self.yellow_points = []
+    def __init__(self, colour):
+        super().__init__(f'lane_path_publisher_{colour}')
+        self.points = []
         self.max_point_step_m = 0.5
-        self.positive_y_bias_m_per_m = 0.1
-        self.positive_x_bias_m_per_m = 0.1
+        self.positive_y_bias_m_per_m = CONFIG_POSITIVE_Y_BIAS_M_PER_M
+        self.positive_x_bias_m_per_m = CONFIG_POSITIVE_X_BIAS_M_PER_M
+        
+        if colour == 'blue':
+            self.positive_y_bias_m_per_m = 0.3
+            self.positive_x_bias_m_per_m = 0.1
+        elif colour == 'yellow':
+            self.positive_y_bias_m_per_m = -0.3
+            self.positive_x_bias_m_per_m = 0.1
 
-        self.sub_blue = self.create_subscription(
-            PointCloud2, '/vision/line_points/blue', self.blue_callback, 10
+        self.sub = self.create_subscription(
+            PointCloud2, f'/vision/line_points/{colour}', self.callback, 10
         )
-        # self.sub_yellow = self.create_subscription(
-        #     PointCloud2, '/vision/line_points/yellow', self.yellow_callback, 10
-        # )
-        self.pub = self.create_publisher(Path, '/vision/path', 10)
+        
+        self.pub = self.create_publisher(Path, f'/vision/path/{colour}', 10)
 
-    def blue_callback(self, msg: PointCloud2):
-        self.blue_points = self.read_point_cloud(msg)
-        self.publish_combined_path(msg.header)
-
-    def yellow_callback(self, msg: PointCloud2):
-        self.yellow_points = self.read_point_cloud(msg)
+    def callback(self, msg: PointCloud2):
+        self.points = self.read_point_cloud(msg)
         self.publish_combined_path(msg.header)
 
     def publish_combined_path(self, header):
-        all_points = self.blue_points + self.yellow_points
-        self.pub.publish(self._to_path(all_points, header))
+        self.pub.publish(self._to_path(self.points, header))
 
     def read_point_cloud(self, msg):
         points = []
@@ -106,11 +109,18 @@ class LanePathPublisher(Node):
     
 def main(args=None):
     rclpy.init(args=args)
-    node = LanePathPublisher()
+    blue_node = LanePathPublisher('blue')
+    yellow_node = LanePathPublisher('yellow')
+    executor = MultiThreadedExecutor()
+    executor.add_node(blue_node)
+    executor.add_node(yellow_node)
+
     try:
-        rclpy.spin(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
-        node.destroy_node()
+        executor.shutdown()
+        blue_node.destroy_node()
+        yellow_node.destroy_node()
         rclpy.shutdown()
