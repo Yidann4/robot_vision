@@ -1,3 +1,4 @@
+# Launches everything needed to create the /vision/line_points topics which are pointclouds of the racetrack lines
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource

@@ -234,6 +234,7 @@ class LineFilterNode(Node):
         Aggregate points into XY grid cells and return one mean point per cell.
         Cell size is configurable via self.chunk_size_x_m and self.chunk_size_y_m.
         """
+        # return xyz, rgb_packed  # disable chunking for now
         if xyz.shape[0] == 0:
             return xyz, rgb_packed
 
