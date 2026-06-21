@@ -1,4 +1,4 @@
-/**: # should match node name but both blue and yellow versions need to use this
+/laserscan_node: # should match node name but both blue and yellow versions need to use this
   ros__parameters:
     # 1. Coordinate frame alignment (Change to your robot's base or odom frame)
     target_frame: base_footprint

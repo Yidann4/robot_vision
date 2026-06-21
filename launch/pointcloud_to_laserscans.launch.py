@@ -11,31 +11,42 @@ def generate_launch_description():
         'point_cloud_to_laserscan_custom.yaml',
     )
 
-    yellow_scan_node = Node(
-        package='pointcloud_to_laserscan',
-        executable='pointcloud_to_laserscan_node',
-        name='laserscan_node_yellow',
-        output='screen',
-        parameters=[params_file],
-        remappings=[
-            ('cloud_in', '/vision/line_points/yellow'),
-            ('scan', '/vision/scan/yellow'),
-        ],
-    )
+    # yellow_scan_node = Node(
+    #     package='pointcloud_to_laserscan',
+    #     executable='pointcloud_to_laserscan_node',
+    #     name='laserscan_node_yellow',
+    #     output='screen',
+    #     parameters=[params_file],
+    #     remappings=[
+    #         ('cloud_in', '/vision/line_points/yellow'),
+    #         ('scan', '/vision/scan/yellow'),
+    #     ],
+    # )
 
-    blue_scan_node = Node(
+    # blue_scan_node = Node(
+    #     package='pointcloud_to_laserscan',
+    #     executable='pointcloud_to_laserscan_node',
+    #     name='laserscan_node_blue',
+    #     output='screen',
+    #     parameters=[params_file],
+    #     remappings=[
+    #         ('cloud_in', '/vision/line_points/blue'),
+    #         ('scan', '/vision/scan/blue'),
+    #     ],
+    # )
+    
+    scan_node = Node(
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
-        name='laserscan_node_blue',
+        name='laserscan_node',
         output='screen',
         parameters=[params_file],
         remappings=[
-            ('cloud_in', '/vision/line_points/blue'),
-            ('scan', '/vision/scan/blue'),
+            ('cloud_in', '/vision/line_points'),
+            ('scan', '/vision/scan'),
         ],
     )
 
     return LaunchDescription([
-        yellow_scan_node,
-        blue_scan_node,
+        scan_node,
     ])

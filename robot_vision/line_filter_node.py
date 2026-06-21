@@ -5,7 +5,7 @@ Subscribes to:
   /projected_point_cloud     (sensor_msgs/PointCloud2)  xyzrgb
 
 Publishes:
-  /line_points               (sensor_msgs/PointCloud2)  xyzrgb
+    /line_points               (sensor_msgs/PointCloud2)  xyzrgb
     → Only points whose colour falls within the configured HSV range.
       All positions are already in the base_footprint frame (global
       coordinates) — no conversion needed.
@@ -84,9 +84,8 @@ class LineFilterNode(Node):
             10
         )
 
-        # Publish only the filtered line points
-        self.pub_blue = self.create_publisher(PointCloud2, '/vision/line_points/blue', 10)
-        self.pub_yellow = self.create_publisher(PointCloud2, '/vision/line_points/yellow', 10)
+        # Publish combined filtered line points
+        self.pub = self.create_publisher(PointCloud2, '/vision/line_points', 10)
 
         self.get_logger().info(
             f'Subscribing to /vision/projected_point_cloud_rgb\n'
@@ -158,23 +157,16 @@ class LineFilterNode(Node):
 
         keep_blue = colour_masks.get('blue', np.zeros(len(points_raw), dtype=bool))
         keep_yellow = colour_masks.get('yellow', np.zeros(len(points_raw), dtype=bool))
+        keep_combined = keep_blue | keep_yellow
 
-        # ---- Step 4: publish each colour stream independently ----
+        # ---- Step 4: publish one combined stream ----
         self._publish_filtered_cloud(
-            keep_blue,
+            keep_combined,
             xyz,
             rgb_packed,
             msg,
-            self.pub_blue,
-            'blue'
-        )
-        self._publish_filtered_cloud(
-            keep_yellow,
-            xyz,
-            rgb_packed,
-            msg,
-            self.pub_yellow,
-            'yellow'
+            self.pub,
+            'combined'
         )
 
     def _publish_filtered_cloud(self, keep, xyz, rgb_packed, msg, publisher, colour_name):
@@ -234,7 +226,7 @@ class LineFilterNode(Node):
         Aggregate points into XY grid cells and return one mean point per cell.
         Cell size is configurable via self.chunk_size_x_m and self.chunk_size_y_m.
         """
-        # return xyz, rgb_packed  # disable chunking for now
+        return xyz, rgb_packed  # disable chunking for now
         if xyz.shape[0] == 0:
             return xyz, rgb_packed
 
