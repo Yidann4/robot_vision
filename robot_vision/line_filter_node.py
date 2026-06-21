@@ -77,17 +77,18 @@ class LineFilterNode(Node):
         # Subscribe to the full projected point cloud
         self.sub = self.create_subscription(
             PointCloud2,
-            '/projected_point_cloud_rgb',
+            '/vision/projected_point_cloud_rgb',
             self.callback,
             10
         )
 
         # Publish only the filtered line points
-        self.pub = self.create_publisher(PointCloud2, '/line_points', 10)
+        self.pub_blue = self.create_publisher(PointCloud2, '/vision/line_points/blue', 10)
+        self.pub_yellow = self.create_publisher(PointCloud2, '/vision/line_points/yellow', 10)
 
         self.get_logger().info(
-            f'Subscribing to /projected_point_cloud_rgb\n'
-            f'Publishing filtered lines to /line_points\n'
+            f'Subscribing to /vision/projected_point_cloud_rgb\n'
+            f'Publishing filtered lines to /vision/line_points\n'
             f'Active colour filters: {list(HSV_RANGES.keys())}'
         )
 
@@ -138,37 +139,56 @@ class LineFilterNode(Node):
         # ourselves using numpy, keeping the node lightweight.
         hsv = self._rgb_to_hsv_numpy(r, g, b)   # shape (N, 3)  H S V
 
-        # ---- Step 3: build a mask for all configured colour ranges ----
-        # Start with all False, then OR in each colour range
-        keep = np.zeros(len(points_raw), dtype=bool)
-
+        # ---- Step 3: build one mask per configured colour ----
+        colour_masks = {}
         for name, (h_min, h_max, s_min, s_max, v_min, v_max) in HSV_RANGES.items():
             mask = (
                 (hsv[:, 0] >= h_min) & (hsv[:, 0] <= h_max) &
                 (hsv[:, 1] >= s_min) & (hsv[:, 1] <= s_max) &
                 (hsv[:, 2] >= v_min) & (hsv[:, 2] <= v_max)
             )
+            colour_masks[name] = mask
             n_matched = int(np.sum(mask))
             if n_matched > 0:
                 self.get_logger().debug(
                     f'Colour [{name}]: {n_matched} points matched'
                 )
-            keep |= mask
 
-        # ---- Step 4: apply minimum cluster size filter ----
-        # If fewer than MIN_CLUSTER_POINTS matched in total, it is likely
-        # noise rather than a real line — skip publishing this frame.
+        keep_blue = colour_masks.get('blue', np.zeros(len(points_raw), dtype=bool))
+        keep_yellow = colour_masks.get('yellow', np.zeros(len(points_raw), dtype=bool))
+
+        # ---- Step 4: publish each colour stream independently ----
+        self._publish_filtered_cloud(
+            keep_blue,
+            xyz,
+            rgb_packed,
+            msg,
+            self.pub_blue,
+            'blue'
+        )
+        self._publish_filtered_cloud(
+            keep_yellow,
+            xyz,
+            rgb_packed,
+            msg,
+            self.pub_yellow,
+            'yellow'
+        )
+
+    def _publish_filtered_cloud(self, keep, xyz, rgb_packed, msg, publisher, colour_name):
         total_kept = int(np.sum(keep))
         if total_kept < MIN_CLUSTER_POINTS:
             self.get_logger().debug(
-                f'Only {total_kept} points matched — below minimum, skipping'
+                f'Only {total_kept} {colour_name} points matched — below minimum, skipping'
             )
             return
 
-        if DEBUG:
-            self.get_logger().debug(f'Publishing {total_kept} line points')
+        if total_kept == 0:
+            return
 
-       # ---- Step 5: rebuild the filtered points into a PointCloud2 ----
+        if DEBUG:
+            self.get_logger().debug(f'Publishing {total_kept} {colour_name} line points')
+
         filtered_xyz = xyz[keep]                                    # shape (M, 3) float32
 
         # Create a structured numpy array that perfectly matches the cloud layout.
@@ -193,7 +213,7 @@ class LineFilterNode(Node):
             points=filtered_struct
         )
 
-        self.pub.publish(out_msg)
+        publisher.publish(out_msg)
 
     @staticmethod
     def _rgb_to_hsv_numpy(r: np.ndarray, g: np.ndarray, b: np.ndarray) -> np.ndarray:

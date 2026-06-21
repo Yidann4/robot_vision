@@ -31,6 +31,8 @@ setup(
             'line_filter_node = robot_vision.line_filter_node:main',
             'hsv_tuner_node = robot_vision.hsv_tuner:main',
             'bgr_to_rgb_node = robot_vision.bgr_to_rgb_node:main',
+            'lane_publisher_node = robot_vision.lane_publisher:main',
+            'binner_node = robot_vision.binner_node:main',
         ],
     },
 )

@@ -9,7 +9,7 @@ class BGRtoRGBConverter(Node):
         self.sub = self.create_subscription(
             PointCloud2, '/projected_point_cloud', self.callback, 10)
         self.pub = self.create_publisher(
-            PointCloud2, '/projected_point_cloud_rgb', 10)
+            PointCloud2, '/vision/projected_point_cloud_rgb', 10)
 
     def callback(self, msg):
         # Copy all fields
