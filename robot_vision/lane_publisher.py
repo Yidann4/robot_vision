@@ -1,4 +1,5 @@
 import rclpy
+import math
 
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
@@ -11,13 +12,16 @@ class LanePathPublisher(Node):
         super().__init__('lane_path_publisher')
         self.blue_points = []
         self.yellow_points = []
+        self.max_point_step_m = 0.5
+        self.positive_y_bias_m_per_m = 0.1
+        self.positive_x_bias_m_per_m = 0.1
 
         self.sub_blue = self.create_subscription(
             PointCloud2, '/vision/line_points/blue', self.blue_callback, 10
         )
-        self.sub_yellow = self.create_subscription(
-            PointCloud2, '/vision/line_points/yellow', self.yellow_callback, 10
-        )
+        # self.sub_yellow = self.create_subscription(
+        #     PointCloud2, '/vision/line_points/yellow', self.yellow_callback, 10
+        # )
         self.pub = self.create_publisher(Path, '/vision/path', 10)
 
     def blue_callback(self, msg: PointCloud2):
@@ -48,7 +52,45 @@ class LanePathPublisher(Node):
                 x = float(point[0])
                 y = float(point[1])
             points.append((x, y))
-        return points
+        return self._sort_points_nearest_chain(points)
+
+    def _sort_points_nearest_chain(self, points):
+        if not points:
+            return []
+
+        remaining = list(points)
+
+        # Start from the point nearest to the robot origin (0, 0).
+        start_idx = min(
+            range(len(remaining)),
+            key=lambda i: remaining[i][0] * remaining[i][0] + remaining[i][1] * remaining[i][1],
+        )
+        ordered = [remaining.pop(start_idx)]
+
+        # Greedily append the point nearest to the last selected point.
+        while remaining:
+            last_x, last_y = ordered[-1]
+            next_idx = min(
+                range(len(remaining)),
+                key=lambda i: (
+                    math.dist((last_x, last_y), remaining[i])
+                    - self.positive_y_bias_m_per_m * remaining[i][1] # bias towards positive y
+                    - self.positive_x_bias_m_per_m * remaining[i][0] # bias towards positive x
+                ),
+            )
+            
+            # if next point too far, stop
+            next_point = remaining[next_idx]
+            step_dist = math.dist((last_x, last_y), next_point)
+            if step_dist > self.max_point_step_m:
+                # self.get_logger().info(
+                #     f'Stopping chain: next point distance {step_dist:.3f} m '
+                #     f'> {self.max_point_step_m:.3f} m'
+                # )
+                break
+            ordered.append(remaining.pop(next_idx))
+
+        return ordered
     
     def _to_path(self, pts, header) -> Path:
         path = Path()
