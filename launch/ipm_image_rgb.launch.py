@@ -14,6 +14,7 @@ def generate_launch_description():
         parameters=[{
             'type': 'rgb_image',
             'output_frame': 'base_footprint',
+            'ipm_scale': 0.25
         }],
     )
     
