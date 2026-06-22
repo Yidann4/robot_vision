@@ -38,6 +38,7 @@ setup(
             'lane_publisher_node = robot_vision.lane_publisher:main',
             'binner_node = robot_vision.binner_node:main',
             'pointcloud_binner_node = robot_vision.pointcloud_binner_node:main',
+            'midpoint_drawer_node = robot_vision.midpoint_drawer_node:main',
         ],
     },
 )
