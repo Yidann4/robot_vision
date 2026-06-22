@@ -9,6 +9,8 @@ class CenterlineGenerator(Node):
     def __init__(self):
         super().__init__('centerline_generator')
 
+        self.extension_length = 0.4  # Meters to extend beyond the last point
+
         # 1. Setup synchronized subscribers for the two boundaries
         self.blue_sub = message_filters.Subscriber(self, Path, '/vision/path/blue')
         self.yellow_sub = message_filters.Subscriber(self, Path, '/vision/path/yellow')
@@ -59,6 +61,28 @@ class CenterlineGenerator(Node):
             pose_stamped.pose.position.z = b_pose.pose.position.z  # Match elevation
             
             centerline_msg.poses.append(pose_stamped)
+
+        # Append one forward extrapolated point 0.2 m beyond the last midpoint.
+        if len(centerline_msg.poses) >= 2:
+            prev_pose = centerline_msg.poses[-2].pose.position
+            last_pose = centerline_msg.poses[-1].pose.position
+
+            dx = last_pose.x - prev_pose.x
+            dy = last_pose.y - prev_pose.y
+            seg_len = float(np.hypot(dx, dy))
+
+            if seg_len > 1e-6:
+                extension = self.extension_length
+                ex = (dx / seg_len) * extension
+                ey = (dy / seg_len) * extension
+
+                end_pose = PoseStamped()
+                end_pose.header = centerline_msg.header
+                end_pose.pose.position.x = last_pose.x + ex
+                end_pose.pose.position.y = last_pose.y + ey
+                end_pose.pose.position.z = last_pose.z
+                end_pose.pose.orientation.w = 1.0
+                centerline_msg.poses.append(end_pose)
 
         # Publish the final centerline
         self.centerline_pub.publish(centerline_msg)
