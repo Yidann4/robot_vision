@@ -27,7 +27,7 @@ class LanePathPublisher(Node):
             self.positive_x_bias_m_per_m = 0.1
 
         self.sub = self.create_subscription(
-            PointCloud2, f'/vision/line_points/{colour}', self.callback, 10
+            PointCloud2, f'/vision/point_cloud_binned/{colour}', self.callback, 10
         )
         
         self.pub = self.create_publisher(Path, f'/vision/path/{colour}', 10)

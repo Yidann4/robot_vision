@@ -1,0 +1,24 @@
+hsv_filter_node:
+  ros__parameters:
+    input_topic: "/camera/image_raw"
+    yellow_mask_topic: "/vision/hsv_mask/yellow"
+    yellow_filtered_topic: "/vision/hsv_filtered/yellow"
+    blue_mask_topic: "/vision/hsv_mask/blue"
+    blue_filtered_topic: "/vision/hsv_filtered/blue"
+
+    # OpenCV HSV ranges: H 0-179, S 0-255, V 0-255
+    # Yellow baseline
+    yellow_h_min: 8
+    yellow_h_max: 70
+    yellow_s_min: 0
+    yellow_s_max: 255
+    yellow_v_min: 0
+    yellow_v_max: 255
+
+    # Blue baseline
+    blue_h_min: 87
+    blue_h_max: 179
+    blue_s_min: 0
+    blue_s_max: 255
+    blue_v_min: 0
+    blue_v_max: 255
