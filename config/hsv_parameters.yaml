@@ -1,6 +1,7 @@
 hsv_filter_node:
   ros__parameters:
-    input_topic: "/camera/image_raw"
+    #input_topic: "/camera/image_raw" ##SIMULATOR
+    input_topic: "image_raw/compressed" ##REAL
     yellow_mask_topic: "/vision/hsv_mask/yellow"
     yellow_filtered_topic: "/vision/hsv_filtered/yellow"
     blue_mask_topic: "/vision/hsv_mask/blue"

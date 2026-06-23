@@ -23,7 +23,8 @@ def generate_launch_description():
         executable='ipm',
         output='screen',
         remappings=[
-            ('camera_info', '/camera/camera_info'),
+            #('camera_info', '/camera/camera_info'), ###FOR SIM
+            ('camera_info', '/camera_info'), ###FOR REAL
             ('input', '/vision/hsv_mask/yellow'),
             ('projected_point_cloud', '/ipm_cloud/yellow'),
         ],

@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge
 
 
@@ -45,7 +45,7 @@ class HSVFilterNode(Node):
 		self.blue_filtered_topic = self.get_parameter('blue_filtered_topic').value
 
 		self.sub = self.create_subscription(
-			Image,
+			CompressedImage, #######CHANGED FROM Image#######
 			self.input_topic,
 			self.image_callback,
 			10,
@@ -92,7 +92,17 @@ class HSVFilterNode(Node):
 		filtered_pub.publish(filtered_msg)
 
 	def image_callback(self, msg: Image):
-		frame_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+		#frame_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8') #decode regular image
+		#--------------------------------------------# decode compressed image
+		np_arr = np.frombuffer(msg.data, np.uint8)
+		frame_bgr = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+		if frame_bgr is None:
+			self.get_logger().warn("Failed to decode compressed image")
+			return
+		#--------------------------------------------#
+
+
 		hsv = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2HSV)
 
 		yellow_lower, yellow_upper = self._get_hsv_bounds('yellow')

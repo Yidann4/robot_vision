@@ -27,7 +27,13 @@ def generate_launch_description():
         executable='lane_publisher_node',
         output='screen',
     )
-    
+
+    midpoint_publisher_node = Node(
+        package='robot_vision',
+        executable='midpoint_drawer_node',
+        output='screen',
+    )
+
     rviz_node = Node(
             package='rviz2',
             executable='rviz2',
@@ -38,5 +44,6 @@ def generate_launch_description():
     launch_description.add_action(extract_lines_launch)
     launch_description.add_action(point_cloud_binner)
     launch_description.add_action(lane_publisher_node)
+    launch_description.add_action(midpoint_publisher_node)
     launch_description.add_action(rviz_node)
     return launch_description
