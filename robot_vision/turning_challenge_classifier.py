@@ -1,5 +1,4 @@
 import cv2
-import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -47,22 +46,21 @@ class TurningChallengeClassifier(Node):
         bbox_center_x = x + (w / 2)
         bbox_center_x_int = int(bbox_center_x)
 
-
-        # Use densest mask-column location rather than centroid.
-        densest_x, densest_y = self.get_densest_position(mask, arrow_contour)
-        if densest_x is None:
+        # Use the x position of the max-y pixel in the contour region.
+        point_x, point_y = self.get_max_y_position(mask, arrow_contour)
+        if point_x is None:
             if self.config_debug:
-                self.get_logger().info('Could not determine densest pixel position')
+                self.get_logger().info('Could not determine max-y contour position')
             return
 
-        direction = self.evaluate_and_publish(bbox_center_x_int, densest_x)
+        direction = self.evaluate_and_publish(bbox_center_x_int, point_x)
         
         if self.config_debug:
             debug_image = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
             cv2.rectangle(debug_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.circle(debug_image, (densest_x, densest_y), 6, (0, 0, 255), -1)
+            cv2.circle(debug_image, (point_x, point_y), 6, (0, 0, 255), -1)
             cv2.line(debug_image, (bbox_center_x_int, 0), (bbox_center_x_int, mask.shape[0] - 1), (255, 0, 0), 2)
-            cv2.line(debug_image, (densest_x, 0), (densest_x, mask.shape[0] - 1), (255, 255, 0), 1)
+            cv2.line(debug_image, (point_x, 0), (point_x, mask.shape[0] - 1), (255, 255, 0), 1)
             cv2.putText(debug_image, direction, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
 
             debug_msg = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
@@ -92,32 +90,25 @@ class TurningChallengeClassifier(Node):
         simplified_contour = cv2.approxPolyDP(arrow_contour, epsilon, True)
         return simplified_contour
 
-    def get_densest_position(self, mask, contour):
-        # 1. Create a mask just for this contour
-        contour_mask = np.zeros_like(mask)
+    def get_max_y_position(self, mask, contour):
+        contour_mask = mask.copy()
+        contour_mask[:] = 0
         cv2.drawContours(contour_mask, [contour], -1, 255, thickness=cv2.FILLED)
 
-        # 2. Extract the actual white pixels belonging to the contour
         contour_pixels = cv2.bitwise_and(mask, contour_mask)
-        
-        if cv2.countNonZero(contour_pixels) == 0:
+
+        points = cv2.findNonZero(contour_pixels)
+        if points is None:
             return None, None
 
-        # 3. Apply Distance Transform
-        # This calculates how far each white pixel is from the closest black background pixel
-        dist_transform = cv2.distanceTransform(contour_pixels, cv2.DIST_L2, 5)
-        
-        # 4. Find the global maximum
-        # The point furthest from any edge is the center of the biggest "blob"
-        _, max_val, _, max_loc = cv2.minMaxLoc(dist_transform)
-        
-        # max_loc is returned as a tuple: (x, y)
-        densest_x, densest_y = max_loc
-        
-        return int(densest_x), int(densest_y)
+        max_y = int(points[:, 0, 1].min()) # turns out its reversed
+        max_y_points = points[points[:, 0, 1] == max_y][:, 0, :]
+        max_y_x = int(max_y_points[:, 0].mean())
+
+        return max_y_x, max_y
     
-    def evaluate_and_publish(self, bbox_center_x_int, densest_x):
-        direction = 'left' if densest_x < bbox_center_x_int else 'right'
+    def evaluate_and_publish(self, bbox_center_x_int, point_x):
+        direction = 'left' if point_x < bbox_center_x_int else 'right'
         direction_msg = String()
         direction_msg.data = direction
         self.direction_publisher.publish(direction_msg)
