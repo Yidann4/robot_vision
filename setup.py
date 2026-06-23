@@ -41,6 +41,7 @@ setup(
             'pointcloud_binner_node = robot_vision.pointcloud_binner_node:main',
             'midpoint_drawer_node = robot_vision.midpoint_drawer_node:main',
             'turning_challenge_classifier_node = robot_vision.turning_challenge_classifier:main',
+            'line_smoother_node = robot_vision.line_smoother_node:main',
         ],
     },
 )

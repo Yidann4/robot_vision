@@ -12,8 +12,8 @@ class CenterlineGenerator(Node):
         self.extension_length = 0.4  # Meters to extend beyond the last point
 
         # 1. Setup synchronized subscribers for the two boundaries
-        self.blue_sub = message_filters.Subscriber(self, Path, '/vision/path/blue')
-        self.yellow_sub = message_filters.Subscriber(self, Path, '/vision/path/yellow')
+        self.blue_sub = message_filters.Subscriber(self, Path, '/vision/smoothed_path/blue')
+        self.yellow_sub = message_filters.Subscriber(self, Path, '/vision/smoothed_path/yellow')
 
         # Adjust slop (seconds) based on your pipeline's latency
         self.ts = message_filters.ApproximateTimeSynchronizer(
