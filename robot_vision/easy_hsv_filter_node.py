@@ -28,6 +28,11 @@ class EasyHSVFilterNode(Node):
 		self.declare_parameter('v_min', 0)
 		self.declare_parameter('v_max', 255)
 
+		# Morphology controls
+		self.declare_parameter('morph_kernel_size', 3)
+		self.declare_parameter('erode_iterations', 1)
+		self.declare_parameter('dilate_iterations', 1)
+
 		self.input_topic = str(self.get_parameter('input_topic').value)
 		self.output_topic = str(self.get_parameter('output_topic').value)
 
@@ -61,6 +66,23 @@ class EasyHSVFilterNode(Node):
 
 		lower, upper = self._get_hsv_bounds()
 		mask = cv2.inRange(frame_hsv, lower, upper)
+
+		kernel_size = int(self.get_parameter('morph_kernel_size').value)
+		erode_iterations = int(self.get_parameter('erode_iterations').value)
+		dilate_iterations = int(self.get_parameter('dilate_iterations').value)
+
+		kernel_size = max(1, kernel_size)
+		if kernel_size % 2 == 0:
+			kernel_size += 1
+
+		erode_iterations = max(0, erode_iterations)
+		dilate_iterations = max(0, dilate_iterations)
+
+		kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
+		if erode_iterations > 0:
+			mask = cv2.erode(mask, kernel, iterations=erode_iterations)
+		if dilate_iterations > 0:
+			mask = cv2.dilate(mask, kernel, iterations=dilate_iterations)
 
 		mask_msg = self.bridge.cv2_to_imgmsg(mask, encoding='mono8')
 		mask_msg.header = msg.header

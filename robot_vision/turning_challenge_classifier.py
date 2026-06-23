@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -44,29 +45,30 @@ class TurningChallengeClassifier(Node):
         # 4. Get the bounding box of the arrow
         x, y, w, h = cv2.boundingRect(arrow_contour)
         bbox_center_x = x + (w / 2)
-        
-        # 5. Calculate the Centroid (Center of Mass) of the arrow using Moments
-        M = cv2.moments(arrow_contour)
-        
-        if M["m00"] == 0:
-            if self.config_debug:
-                self.get_logger().info('Error calculating moments')
-            return
-        centroid_x = int(M["m10"] / M["m00"])
-        centroid_y = int(M["m01"] / M["m00"])
+        bbox_center_x_int = int(bbox_center_x)
 
-        bbox_center_x_int, _direction = self.evaluate_and_publish(bbox_center_x, centroid_x)
+
+        # Use densest mask-column location rather than centroid.
+        densest_x, densest_y = self.get_densest_position(mask, arrow_contour)
+        if densest_x is None:
+            if self.config_debug:
+                self.get_logger().info('Could not determine densest pixel position')
+            return
+
+        direction = self.evaluate_and_publish(bbox_center_x_int, densest_x)
         
         if self.config_debug:
             debug_image = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
             cv2.rectangle(debug_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.circle(debug_image, (centroid_x, centroid_y), 6, (0, 0, 255), -1)
+            cv2.circle(debug_image, (densest_x, densest_y), 6, (0, 0, 255), -1)
             cv2.line(debug_image, (bbox_center_x_int, 0), (bbox_center_x_int, mask.shape[0] - 1), (255, 0, 0), 2)
+            cv2.line(debug_image, (densest_x, 0), (densest_x, mask.shape[0] - 1), (255, 255, 0), 1)
             cv2.putText(debug_image, direction, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
 
             debug_msg = self.bridge.cv2_to_imgmsg(debug_image, encoding='bgr8')
             debug_msg.header = msg.header
             self.debug_publisher.publish(debug_msg)
+            self.get_logger().info(f'Published debug image with direction: {direction}')
         
     def check_has_minimum_mask_pixels(self, mask):
         if cv2.countNonZero(mask) < self.min_mask_pixels:
@@ -89,14 +91,37 @@ class TurningChallengeClassifier(Node):
         epsilon = 0.01 * cv2.arcLength(arrow_contour, True)
         simplified_contour = cv2.approxPolyDP(arrow_contour, epsilon, True)
         return simplified_contour
+
+    def get_densest_position(self, mask, contour):
+        # 1. Create a mask just for this contour
+        contour_mask = np.zeros_like(mask)
+        cv2.drawContours(contour_mask, [contour], -1, 255, thickness=cv2.FILLED)
+
+        # 2. Extract the actual white pixels belonging to the contour
+        contour_pixels = cv2.bitwise_and(mask, contour_mask)
+        
+        if cv2.countNonZero(contour_pixels) == 0:
+            return None, None
+
+        # 3. Apply Distance Transform
+        # This calculates how far each white pixel is from the closest black background pixel
+        dist_transform = cv2.distanceTransform(contour_pixels, cv2.DIST_L2, 5)
+        
+        # 4. Find the global maximum
+        # The point furthest from any edge is the center of the biggest "blob"
+        _, max_val, _, max_loc = cv2.minMaxLoc(dist_transform)
+        
+        # max_loc is returned as a tuple: (x, y)
+        densest_x, densest_y = max_loc
+        
+        return int(densest_x), int(densest_y)
     
-    def evaluate_and_publish(self, bbox_center_x, centroid_x):
-        bbox_center_x_int = int(bbox_center_x)
-        direction = 'left' if centroid_x < bbox_center_x_int else 'right'
+    def evaluate_and_publish(self, bbox_center_x_int, densest_x):
+        direction = 'left' if densest_x < bbox_center_x_int else 'right'
         direction_msg = String()
         direction_msg.data = direction
         self.direction_publisher.publish(direction_msg)
-        return bbox_center_x_int, direction
+        return direction
         
     
         
