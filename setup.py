@@ -32,6 +32,7 @@ setup(
         'console_scripts': [
             'test_image_publisher = robot_vision.test_image_publisher:main', #    ^executable     ^module path          ^function
             'hsv_filter_node = robot_vision.hsv_filter_node:main',
+            'easy_hsv_filter_node = robot_vision.easy_hsv_filter_node:main',
             'line_filter_node = robot_vision.line_filter_node:main',
             'hsv_tuner_node = robot_vision.hsv_tuner:main',
             'bgr_to_rgb_node = robot_vision.bgr_to_rgb_node:main',
@@ -39,6 +40,7 @@ setup(
             'binner_node = robot_vision.binner_node:main',
             'pointcloud_binner_node = robot_vision.pointcloud_binner_node:main',
             'midpoint_drawer_node = robot_vision.midpoint_drawer_node:main',
+            'turning_challenge_classifier_node = robot_vision.turning_challenge_classifier:main',
         ],
     },
 )

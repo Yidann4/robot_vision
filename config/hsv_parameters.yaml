@@ -22,3 +22,15 @@ hsv_filter_node:
     blue_s_max: 255
     blue_v_min: 0
     blue_v_max: 255
+
+/hsv_filter_node_black:
+  ros__parameters:
+
+    # OpenCV HSV ranges: H 0-179, S 0-255, V 0-255
+    # Black baseline
+    black_h_min: 20
+    black_h_max: 46
+    black_s_min: 125
+    black_s_max: 255
+    black_v_min: 0
+    black_v_max: 77

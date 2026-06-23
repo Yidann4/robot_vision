@@ -1,3 +1,5 @@
+# publishes to both blue and yellow topics
+
 #!/usr/bin/env python3
 import cv2
 import numpy as np

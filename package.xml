@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>numpy</depend>
 
   <exec_depend>ipm_image_node</exec_depend>
