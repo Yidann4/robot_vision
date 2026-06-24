@@ -1,3 +1,5 @@
+# ros2 run robot_vision test_image_publisher --ros-args -p image_path:='medium_black_arrow.png'
+
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
