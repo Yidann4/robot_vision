@@ -11,12 +11,12 @@ def generate_launch_description():
         'hsv_parameters.yaml'
     )
 
-    hsv_filter_node = Node(
-        package='robot_vision',
-        executable='hsv_filter_node',
-        output='screen',
-        parameters=[hsv_parameters],
-    )
+    # hsv_filter_node = Node(
+    #     package='robot_vision',
+    #     executable='hsv_filter_node',
+    #     output='screen',
+    #     parameters=[hsv_parameters],
+    # )
     
     ipm_node_yellow = Node(
         package='ipm_image_node',
@@ -30,7 +30,8 @@ def generate_launch_description():
         ],
         parameters=[{
             'type': 'mask',
-            'output_frame': 'base_footprint',
+            'output_frame': 'base_link',
+            'use_distortion': False,
         }],
     )
     
@@ -39,13 +40,15 @@ def generate_launch_description():
         executable='ipm',
         output='screen',
         remappings=[
-            ('camera_info', '/camera/camera_info'),
+            #('camera_info', '/camera/camera_info'), ###FOR SIM
+            ('camera_info', '/camera_info'), ###FOR REAL
             ('input', '/vision/hsv_mask/blue'),
             ('projected_point_cloud', '/ipm_cloud/blue'),
         ],
         parameters=[{
             'type': 'mask',
-            'output_frame': 'base_footprint',
+            'output_frame': 'base_link',
+            'use_distortion': False,
         }],
     )
     
@@ -78,7 +81,7 @@ def generate_launch_description():
     
 
     launch_description = LaunchDescription()
-    launch_description.add_action(hsv_filter_node)
+    #launch_description.add_action(hsv_filter_node)
     
     launch_description.add_action(ipm_node_yellow)
     # launch_description.add_action(bgr_to_rgb_yellow)

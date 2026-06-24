@@ -30,6 +30,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'distortion_tuner=robot_vision.distortion_tuner:main',
             'test_image_publisher = robot_vision.test_image_publisher:main', #    ^executable     ^module path          ^function
             'hsv_filter_node = robot_vision.hsv_filter_node:main',
             'line_filter_node = robot_vision.line_filter_node:main',
