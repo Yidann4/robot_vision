@@ -28,6 +28,12 @@ def generate_launch_description():
         output='screen',
     )
     
+    lane_smoother_node = Node(
+        package='robot_vision',
+        executable='line_smoother_node',
+        output='screen', 
+    )
+    
     rviz_node = Node(
             package='rviz2',
             executable='rviz2',

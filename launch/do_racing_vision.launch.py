@@ -9,26 +9,21 @@ import os
 
 def generate_launch_description():
     package_share = get_package_share_directory('robot_vision')
-    ipm_launch_path = os.path.join(package_share, 'launch', 'ipm_image_rgb.launch.py')
+    demonstrate_track_outlines_path = os.path.join(package_share, 'launch', 'demonstrate_track_outlines.launch.py')
+    rviz_config_path = os.path.join(package_share, 'config', 'rviz_config.rviz')
 
-    ipm_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(ipm_launch_path)
-    )
-
-    line_filter_node = Node(
-        package='robot_vision',
-        executable='line_filter_node',
-        output='screen',
+    demonstrate_track_outlines = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(demonstrate_track_outlines_path)
     )
     
-    line_smoother_node = Node(
+    mid_point_draw = Node(
         package='robot_vision',
-        executable='line_smoother_node',
+        executable='midpoint_drawer_node',
         output='screen',
     )
 
+
     launch_description = LaunchDescription()
-    launch_description.add_action(ipm_launch)
-    launch_description.add_action(line_filter_node)
-    launch_description.add_action(line_smoother_node)
+    launch_description.add_action(demonstrate_track_outlines)
+    launch_description.add_action(mid_point_draw)
     return launch_description

@@ -1,3 +1,5 @@
+# makes a smoother for blue and yellow
+
 #!/usr/bin/env python3
 
 from typing import List
