@@ -4,6 +4,7 @@ from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 import message_filters
+import math
 import numpy as np
 
 class CenterlineGenerator(Node):
@@ -31,6 +32,11 @@ class CenterlineGenerator(Node):
         
         self.declare_parameter('CONFIG_DEBUG', False)
         self.debug = self.get_parameter('CONFIG_DEBUG').value
+        
+        
+        self.declare_parameter('look_ahead_distance', 0.5)
+        self.look_ahead_distance = self.get_parameter('look_ahead_distance').value
+        self.pure_pursuit_point_pub = self.create_publisher(PoseStamped, '/map/pure_pursuit_point', 10)
 
     def path_callback(self, blue_path, yellow_path):
         # Edge case: Ensure neither path is empty
@@ -50,6 +56,8 @@ class CenterlineGenerator(Node):
         
         # Publish the final centerline
         self.centerline_pub.publish(centerline_msg)
+        
+        self.maybe_publish_pure_pursuit_point(centerline_msg)
         
     def turning_challenge_callback(self, msg):
         self.turning_challenge = msg.data
@@ -192,6 +200,54 @@ class CenterlineGenerator(Node):
             centerline_msg.poses.append(shifted_pose)
 
         return centerline_msg
+    
+    def maybe_publish_pure_pursuit_point(self, centerline_msg):
+        if not centerline_msg.poses:
+            return
+        
+        # TODO add filtering here
+        
+        target_distance = self.look_ahead_distance       
+        accumulated_distance = 0.0
+        pure_pursuit_point = None
+        
+        # walk every segment length
+        for i in range(len(centerline_msg.poses) - 1):
+            p0 = centerline_msg.poses[i].pose.position
+            p1 = centerline_msg.poses[i + 1].pose.position
+
+            dx = p1.x - p0.x
+            dy = p1.y - p0.y
+            dz = p1.z - p0.z
+            segment_len = math.sqrt(dx*dx + dy*dy + dz*dz)
+
+            # once point is past look ahead interpolate to find exact point at look ahead distance
+            if accumulated_distance + segment_len >= target_distance:
+                if segment_len < 1e-9:
+                    accumulated_distance += segment_len
+                    continue
+
+                # The target point lies within this segment
+                remainder = target_distance - accumulated_distance
+                t = remainder / segment_len          # 0.0 → 1.0 along this segment
+
+                result = PoseStamped()
+                result.header = centerline_msg.poses[i].header       # inherits frame_id and stamp
+                result.pose.position.x = p0.x + t * dx
+                result.pose.position.y = p0.y + t * dy
+                result.pose.position.z = p0.z + t * dz
+
+                # Interpolate orientation (slerp would be ideal, simple lerp shown here)
+                result.pose.orientation = centerline_msg.poses[i].pose.orientation
+
+                pure_pursuit_point = result
+                break
+            
+
+            accumulated_distance += segment_len
+        
+        if pure_pursuit_point is not None:
+            self.pure_pursuit_point_pub.publish(pure_pursuit_point)
 
 def main(args=None):
     rclpy.init(args=args)

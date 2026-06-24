@@ -9,11 +9,11 @@ import os
 
 def generate_launch_description():
     package_share = get_package_share_directory('robot_vision')
-    extract_lines_path = os.path.join(package_share, 'launch', 'extract_lines.launch.py')
     rviz_config_path = os.path.join(package_share, 'config', 'rviz_config.rviz')
+    ipm_launch_path = os.path.join(package_share, 'launch', 'ipm_image_rgb.launch.py')
 
-    extract_lines_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(extract_lines_path)
+    ipm_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(ipm_launch_path)
     )
     
     point_cloud_binner = Node(
@@ -41,8 +41,9 @@ def generate_launch_description():
         )
 
     launch_description = LaunchDescription()
-    launch_description.add_action(extract_lines_launch)
+    launch_description.add_action(ipm_launch)
     launch_description.add_action(point_cloud_binner)
     launch_description.add_action(lane_publisher_node)
+    launch_description.add_action(lane_smoother_node)
     launch_description.add_action(rviz_node)
     return launch_description
