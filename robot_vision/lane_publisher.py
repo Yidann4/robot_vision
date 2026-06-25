@@ -22,11 +22,11 @@ class LanePathPublisher(Node):
         self.positive_x_bias_m_per_m = CONFIG_POSITIVE_X_BIAS_M_PER_M
         
         if colour == 'blue':
-            self.positive_y_bias_m_per_m = 0.3
-            self.positive_x_bias_m_per_m = 0.1
+            self.positive_y_bias_m_per_m = -CONFIG_POSITIVE_Y_BIAS_M_PER_M
+            self.positive_x_bias_m_per_m = CONFIG_POSITIVE_X_BIAS_M_PER_M
         elif colour == 'yellow':
-            self.positive_y_bias_m_per_m = -0.3
-            self.positive_x_bias_m_per_m = 0.1
+            self.positive_y_bias_m_per_m = CONFIG_POSITIVE_Y_BIAS_M_PER_M
+            self.positive_x_bias_m_per_m = CONFIG_POSITIVE_X_BIAS_M_PER_M
 
         self.sub = self.create_subscription(
             PointCloud2, f'/vision/point_cloud_binned/{colour}', self.callback, 10
@@ -65,10 +65,14 @@ class LanePathPublisher(Node):
 
         remaining = list(points)
 
-        # Start from the point nearest to the robot origin (0, 0).
+        # Start from a point near the robot origin, with the same lane biasing used below.
         start_idx = min(
             range(len(remaining)),
-            key=lambda i: remaining[i][0] * remaining[i][0] + remaining[i][1] * remaining[i][1],
+            key=lambda i: (
+                math.dist((0.0, 0.0), remaining[i])
+                - self.positive_y_bias_m_per_m * remaining[i][1]
+                - self.positive_x_bias_m_per_m * remaining[i][0]
+            ),
         )
         ordered = [remaining.pop(start_idx)]
 
@@ -79,8 +83,7 @@ class LanePathPublisher(Node):
                 range(len(remaining)),
                 key=lambda i: (
                     math.dist((last_x, last_y), remaining[i])
-                    - self.positive_y_bias_m_per_m * remaining[i][1] # bias towards positive y
-                    - self.positive_x_bias_m_per_m * remaining[i][0] # bias towards positive x
+                    - 2 * self.positive_y_bias_m_per_m * remaining[i][1] # bias towards positive y
                 ),
             )
             

@@ -2,16 +2,14 @@
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
-from cv_bridge import CvBridge
+from sensor_msgs.msg import CompressedImage
 import cv2
 
 class ImagePublisher(Node):
     def __init__(self):
         super().__init__('custom_image_publisher')
-        self.publisher_ = self.create_publisher(Image, '/static_test/tuning_image', 10)
+        self.publisher_ = self.create_publisher(CompressedImage, '/image_raw/compressed', 10)
         self.timer = self.create_timer(1/10.0, self.timer_callback)  # 10fps
-        self.bridge = CvBridge()
         
         
         self.declare_parameter(
@@ -24,19 +22,20 @@ class ImagePublisher(Node):
         if self.image is None:
             self.get_logger().error(f'Failed to load image from: {image_path}')
         else:
-            self.image = cv2.cvtColor(self.image, cv2.COLOR_BGR2RGB)
-            self.get_logger().info(f'Loaded image from: {image_path}')
-    
-        if self.image is None:
-            self.get_logger().error(f'Failed to load image from: {image_path}')
-        else:
             self.get_logger().info(f'Loaded image from: {image_path}')
         
     def timer_callback(self):
         if self.image is not None:
-            msg = self.bridge.cv2_to_imgmsg(self.image, encoding='rgb8')
+            ok, encoded = cv2.imencode('.jpg', self.image)
+            if not ok:
+                self.get_logger().error('Failed to encode image as JPEG')
+                return
+
+            msg = CompressedImage()
             msg.header.stamp = self.get_clock().now().to_msg()
             msg.header.frame_id = 'camera'
+            msg.format = 'jpeg'
+            msg.data = encoded.tobytes()
             self.publisher_.publish(msg)
             # self.get_logger().info("Published image at time: " + str(msg.header.stamp))
 

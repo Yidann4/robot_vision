@@ -3,14 +3,19 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 from cv_bridge import CvBridge
 
 class HSVCalibratorNode(Node):
     def __init__(self):
         super().__init__('hsv_calibrator')
         self.bridge = CvBridge()
-        self.sub = self.create_subscription(Image, '/static_test/tuning_image', self.image_callback, 10)
+        self.sub = self.create_subscription(
+            CompressedImage,
+            '/image_raw/compressed',
+            self.image_callback,
+            10
+        )
         self.latest_img = None
 
         # Create windows
@@ -24,7 +29,10 @@ class HSVCalibratorNode(Node):
         cv2.createTrackbar('V_max', 'mask', 255, 255, lambda x: None)
 
     def image_callback(self, msg):
-        self.latest_img = self.bridge.imgmsg_to_cv2(msg, 'bgr8')
+        try:
+            self.latest_img = self.bridge.compressed_imgmsg_to_cv2(msg, 'bgr8')
+        except Exception as exc:
+            self.get_logger().error(f'Failed to decode compressed image: {exc}')
 
     def run(self):
         while rclpy.ok():

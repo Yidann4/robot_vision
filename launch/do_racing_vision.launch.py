@@ -21,6 +21,15 @@ def generate_launch_description():
         executable='midpoint_drawer_node',
         output='screen',
     )
+    
+    turning_challenge_classifier_node = Node(
+        package='robot_vision',
+        executable='turning_challenge_classifier_node',
+        output='screen',
+        parameters=[
+            {'min_mask_pixels': 100},
+        ],
+    )
 
 
     launch_description = LaunchDescription()

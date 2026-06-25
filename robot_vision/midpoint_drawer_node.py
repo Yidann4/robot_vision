@@ -34,8 +34,10 @@ class CenterlineGenerator(Node):
         self.debug = self.get_parameter('CONFIG_DEBUG').value
         
         
-        self.declare_parameter('look_ahead_distance', 0.5)
+        self.declare_parameter('look_ahead_distance', 0.6)
         self.look_ahead_distance = self.get_parameter('look_ahead_distance').value
+        self.declare_parameter('min_path_length', 0.15)
+        self.min_path_length = self.get_parameter('min_path_length').value
         self.pure_pursuit_point_pub = self.create_publisher(PoseStamped, '/map/pure_pursuit_point', 10)
 
     def path_callback(self, blue_path, yellow_path):
@@ -57,7 +59,7 @@ class CenterlineGenerator(Node):
         # Publish the final centerline
         self.centerline_pub.publish(centerline_msg)
         
-        self.maybe_publish_pure_pursuit_point(centerline_msg)
+        self.maybe_publish_pure_pursuit_point(centerline_msg, blue_path, yellow_path)
         
     def turning_challenge_callback(self, msg):
         self.turning_challenge = msg.data
@@ -201,11 +203,13 @@ class CenterlineGenerator(Node):
 
         return centerline_msg
     
-    def maybe_publish_pure_pursuit_point(self, centerline_msg):
+    def maybe_publish_pure_pursuit_point(self, centerline_msg, blue_path, yellow_path):
         if not centerline_msg.poses:
             return
-        
-        # TODO add filtering here
+
+        if self.should_filter_pure_pursuit_point(blue_path, yellow_path):
+            return
+
         
         target_distance = self.look_ahead_distance       
         accumulated_distance = 0.0
@@ -249,8 +253,76 @@ class CenterlineGenerator(Node):
         if pure_pursuit_point is not None:
             self.pure_pursuit_point_pub.publish(pure_pursuit_point)
 
+    # check if point should be removed (not sent)
+    def should_filter_pure_pursuit_point(self, blue_path, yellow_path):
+        blue_length = self.compute_path_length(blue_path)
+        yellow_length = self.compute_path_length(yellow_path)
+        if blue_length < self.min_path_length or yellow_length < self.min_path_length:
+            if self.debug:
+                self.get_logger().info(
+                    f'Skipping pure pursuit publish due to short boundary path length '
+                    f'(blue={blue_length:.3f} m, yellow={yellow_length:.3f} m, '
+                    f'min={self.min_path_length:.3f} m)'
+                )
+            return True
+
+        blue_is_right, right_ratio = self.is_blue_mostly_right_of_yellow(blue_path, yellow_path)
+        if not blue_is_right:
+            if self.debug:
+                self.get_logger().info(
+                    f'Skipping pure pursuit publish because blue path is not mostly right of yellow '
+                    f'(blue_y < yellow_y ratio={right_ratio:.3f}, required>0.500)'
+                )
+            return True
+
+        return False
+
+    def is_blue_mostly_right_of_yellow(self, blue_path, yellow_path):
+        if not blue_path.poses or not yellow_path.poses:
+            return False, 0.0
+
+        yellow_pts = np.array([[p.pose.position.x, p.pose.position.y] for p in yellow_path.poses])
+        if len(yellow_pts) == 0:
+            return False, 0.0
+
+        blue_right_count = 0
+        for b_pose in blue_path.poses:
+            b_x = b_pose.pose.position.x
+            b_y = b_pose.pose.position.y
+
+            distances = np.linalg.norm(yellow_pts - np.array([b_x, b_y]), axis=1)
+            closest_idx = np.argmin(distances)
+            y_y = yellow_pts[closest_idx][1]
+
+            if b_y < y_y:
+                blue_right_count += 1
+
+        right_ratio = blue_right_count / len(blue_path.poses)
+        return right_ratio > 0.5, right_ratio
+
+    def compute_path_length(self, path_msg):
+        if len(path_msg.poses) < 2:
+            return 0.0
+
+        total_length = 0.0
+        for i in range(len(path_msg.poses) - 1):
+            p0 = path_msg.poses[i].pose.position
+            p1 = path_msg.poses[i + 1].pose.position
+            dx = p1.x - p0.x
+            dy = p1.y - p0.y
+            dz = p1.z - p0.z
+            total_length += math.sqrt(dx*dx + dy*dy + dz*dz)
+
+        return total_length
+
 def main(args=None):
     rclpy.init(args=args)
     node = CenterlineGenerator()
-    rclpy.spin(node)
-    rclpy.shutdown()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
